@@ -1,16 +1,15 @@
 INC= -Iinclude/
 SRC=$(wildcard *.c)
 OBJS=$(patsubst %.c,%.o,$(SRC))
-LDFLAGS=  -lpthread
+LDFLAGS=  -lpthread -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_ml -ljpeg
 CFLAGS= $(INC) -g -DDEBUG
 
 ifeq ($(ARCH),arm)
-BIN=server_arm
 CC=arm-linux-gcc
 else
-BIN=server_x86
-CC=gcc
+CC=g++
 endif
+BIN=test_main
 $(BIN):$(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 

@@ -23,6 +23,7 @@
 
 
 
+
 int main (int argc, char **argv) 
 { 
 
@@ -33,7 +34,7 @@ int main (int argc, char **argv)
 	
        	//初始化线程池
 	pool_init(100);
-	
+	thread_send_alarm_init();
 	
 	int socket_fd,*conn_fd;
        	if(0>server_net_init(&socket_fd)){
@@ -42,7 +43,7 @@ int main (int argc, char **argv)
        	}
        	printf("server net init success!\n");
        		
-	int client_addr_len = sizeof(client_addr);
+	socklen_t client_addr_len = sizeof(client_addr);
 	memset(&client_addr,0,client_addr_len);
 	while(1)
 	{

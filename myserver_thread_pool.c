@@ -73,7 +73,7 @@ void pool_init (int max_thread_num)
 
 	for (i = 0; i < max_thread_num; i++) 
 	{  
-		pthread_create (&(pool->threadid[i]), NULL, thread_routine, NULL); 
+		pthread_create(&(pool->threadid[i]), NULL, thread_routine, NULL); 
 	} 
 } 
 
