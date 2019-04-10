@@ -193,7 +193,7 @@ Mat Jpeg2Mat(unsigned char *jpegData, int jpegSize)
 }
 
 
-long unsigned int MoveDetect(Mat background, Mat frame)
+long unsigned int MoveDetect(Mat background, Mat frame,Mat *ret_frame)
 {
 	Mat result = frame.clone();
 	//1.将background和frame转为灰度图
@@ -222,16 +222,16 @@ long unsigned int MoveDetect(Mat background, Mat frame)
 	drawContours(result, contours, -1, Scalar(0, 0, 255), 2);//在result上绘制轮廓
 	//7.查找正外接矩形
 	vector<Rect> boundRect(contours.size());
-	/*if(contours.size()>3){
-		printf("Lex---******************************contours.size:%d\n",contours.size());
-	}
+#ifdef DEBUG
 	for (int i = 0; i < contours.size(); i++)
 	{
 		boundRect[i] = boundingRect(contours[i]);
 		rectangle(result, boundRect[i], Scalar(0, 255, 0), 2);//在result上绘制正外接矩形
 	}
-	return result;*/
+	*ret_frame = result.clone(); 
+#endif
 	return  contours.size();
+
 }
 void thread_send_alarm_resume()
 {
@@ -370,7 +370,8 @@ void *pthread_send_alarm_fun(void *arg)
 		//if(send_alarm_handle() == 0){
 			//thread_send_alarm_pause();
 		//}
-		//thread_send_alarm_pause();
+		printf("lex---pthread_send_alarm_fun\n");
+		thread_send_alarm_pause();
 		usleep(10000);
 	}
 }
@@ -381,12 +382,14 @@ int thread_send_alarm_init()
 	pool_add_task(pthread_send_alarm_fun,NULL);
 }
 static Mat pre_frame;//存储上一帧图像
+static int alarm_frame_count = 0;
    
 void recv_video_data_handle(void *args,int length)
 {
 	int ret=0,count =0,i=0;
 	int fd;
 	long unsigned int result;
+	Mat ret_frame;
 	if(0 != pthread_mutex_lock(&camera_mutex)){
 		printf("write cam_mutex locl fail!\n");
 		return;
@@ -399,16 +402,26 @@ void recv_video_data_handle(void *args,int length)
 	}
 	Mat frame = Jpeg2Mat(&my_image.image_buf[9],count-9);
 	if(pre_frame.empty()){
-		result = MoveDetect(frame, frame);//调用MoveDetect()进行运动物体检测，返回值存入res
+		result = MoveDetect(frame, frame,&ret_frame);//调用MoveDetect()进行运动物体检测，返回值存入res
 	}else{
-		result = MoveDetect(pre_frame, frame);//调用MoveDetect()进行运动物体检测，返回值存入res
+		result = MoveDetect(pre_frame, frame,&ret_frame);//调用MoveDetect()进行运动物体检测，返回值存入res
 	}
 	pre_frame = frame.clone();
-	//imshow("result",result);
-	//waitKey(50);
+#ifdef DEBUG
+	imshow("result",ret_frame);
+	waitKey(50);
+#endif
+	
 	if(result>3){
+		
+		alarm_frame_count++;
+		printf("lex---alarm_frame_count:%d\n",alarm_frame_count);
+		
+	}
+	if(alarm_frame_count >= 3){
 		printf("Lex---检测到物体移动\n");
 		thread_send_alarm_resume();
+		alarm_frame_count = 0;
 	}
 	if(0 != pthread_mutex_unlock(&camera_mutex)){
 		printf("write cam_mutex locl fail!\n");
