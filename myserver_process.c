@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <semaphore.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -269,6 +270,7 @@ void thread_send_alarm_pause()
 #define IPSTR "39.104.164.214"
 #define PORT 8091
 #define BUFSIZE 1024
+#define TIME_OUT_TIME 20 //connect超时时间20秒
 int send_alarm_handle()
 {
 	printf("Lex---send_alarm_handle()\n");
@@ -277,7 +279,12 @@ int send_alarm_handle()
     char str1[4096], str2[4096], recv_str3[4096],buf[BUFSIZE], *str;
     socklen_t len;
     fd_set   t_set;
-
+	int error=-1;
+	fd_set set;
+	bool conn_ret = false;
+	unsigned long int ul = 1;
+	len = sizeof(int);
+	timeval tm;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 		printf("创建网络连接失败,本线程即将终止---socket error!\n");
 		goto err;
@@ -291,10 +298,25 @@ int send_alarm_handle()
 		goto err;
     }
 
+   	
+	ioctl(sockfd, FIONBIO, &ul); //设置为非阻塞模式
+	
+
+
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
-		printf("连接到服务器失败,connect error!\n");
-		goto err;
-    }
+		tm.tv_sec = TIME_OUT_TIME;
+		tm.tv_usec = 0;
+	   	FD_ZERO(&set);
+	   	FD_SET(sockfd, &set);
+	   	if( select(sockfd+1, NULL, &set, NULL, &tm) > 0){
+			getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len);
+		 	if(error == 0) conn_ret = true;
+	 		else conn_ret = false;
+	   	} else conn_ret = false;
+	}else conn_ret = true;
+ 	ul = 0;
+    ioctl(sockfd, FIONBIO, &ul); //设置为阻塞模式
+	if(!conn_ret) goto err;
     printf("与远端建立了连接\n");
 
 
@@ -348,10 +370,11 @@ int send_alarm_handle()
     return 0;
 
 err:
-	FD_ZERO(&t_set);
+	printf("lex---err!!!!!!!!!!!!!\n");
+    FD_ZERO(&t_set);
     FD_SET(sockfd, &t_set);
     close(sockfd);
-	thread_send_alarm_pause();
+    //thread_send_alarm_pause();
 	return -1;
 }
 
@@ -418,7 +441,7 @@ void recv_video_data_handle(void *args,int length)
 		printf("lex---alarm_frame_count:%d\n",alarm_frame_count);
 		
 	}
-	if(alarm_frame_count >= 3){
+	if((alarm_frame_count >= 3)){
 		printf("Lex---检测到物体移动\n");
 		thread_send_alarm_resume();
 		alarm_frame_count = 0;
